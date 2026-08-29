@@ -54,6 +54,53 @@ fn offset<T>(n: u32) -> *const c_void {
 
 // == // Generate your VAO here
 unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
+    let count: i32 = vertices.len() as i32;
+
+    // Generate VAO and bind it
+    let mut vertex_array: u32 = 0;
+    gl::GenVertexArrays(count, &mut vertex_array);
+    gl::BindVertexArray(vertex_array);
+
+    // Generate VBO and bind it
+    let mut vertex_buffer: u32 = 0;
+    gl::GenBuffers(1, &mut vertex_buffer);
+    gl::BindBuffer(gl::ARRAY_BUFFER, vertex_buffer);
+
+    // Fill it with data
+    let size = vertices.len() * std::mem::size_of::<f32>();
+    gl::BufferData(
+            gl::ARRAY_BUFFER,
+            size as isize,
+            vertices.as_ptr() as *const _,
+            gl::STATIC_DRAW
+        );
+        // Configure and enable VAP
+        gl::VertexAttribPointer(
+            1,
+             3,
+             gl::FLOAT,
+             gl::FALSE,
+             20,
+             std::ptr::null()
+        );
+    gl::EnableVertexArrayAttrib(vertex_array, 1);
+
+    // Generate IBO and bind it
+    let mut index_buffer: u32 = 0;
+    let indices_size = indices.len() * std::mem::size_of::<u32>();
+    
+    gl::GenBuffers(1, &mut index_buffer);
+    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, index_buffer);
+
+    // Fill it
+    gl::BufferData(
+        gl::ELEMENT_ARRAY_BUFFER,
+        indices_size as isize,
+        indices.as_ptr() as *const _,
+        gl::STATIC_DRAW
+    );
+    
+    
     // Implement me!
 
     // Also, feel free to delete comments :)
@@ -67,7 +114,7 @@ unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
     // * Fill it with data
     // * Return the ID of the VAO
 
-    0
+    return vertex_array;
 }
 
 
@@ -130,12 +177,58 @@ fn main() {
             println!("GLSL\t: {}", util::get_gl_string(gl::SHADING_LANGUAGE_VERSION));
         }
 
-        // == // Set up your VAO around here
+        // Set up VAO
 
-        let my_vao = unsafe { 1337 };
+        let vertices: Vec<f32> = vec![
+            -0.9, -0.8,
+            -0.5, -0.8,
+            -0.7, -0.4,
+
+            0.5, -0.8,
+            0.9, -0.8,
+            0.7, -0.4,
+
+            -0.9,  0.0,
+            -0.5,  0.0,
+            -0.7,  0.4,
+
+            0.5,  0.0,
+            0.9,  0.0,
+            0.7,  0.4,
+
+            -0.2,  0.3,
+            0.2,  0.3,
+            0.0,  0.8,
+        ];
+
+        let indices: Vec<u32> = vec![
+            0, 1, 2,
+            3, 4, 5,
+            6, 7, 8,
+            9, 10, 11,
+            12, 13, 14,
+        ];
+
+        let my_vao = unsafe {create_vao(&vertices, &indices)};
 
 
         // == // Set up your shaders here
+
+        let simple_shader = unsafe {
+            shader::ShaderBuilder::new()
+                .attach_file("./shaders/simple.vert")
+                .attach_file("./shaders/simple.frag")
+                .link()
+        };
+
+        // Activate shaders and draw vao
+        unsafe {
+            simple_shader.activate();
+            gl::BindVertexArray(my_vao);
+
+        }
+
+        
 
         // Basic usage of shader helper:
         // The example code below creates a 'shader' object.
