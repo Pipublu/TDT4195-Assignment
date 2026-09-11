@@ -9,8 +9,10 @@
 */
 extern crate nalgebra_glm as glm;
 use std::{ mem, ptr, os::raw::c_void };
-use std::thread;
+use std::{result, thread};
 use std::sync::{Mutex, Arc, RwLock};
+use rand::Rng;
+
 
 mod shader;
 mod util;
@@ -51,14 +53,56 @@ fn offset<T>(n: u32) -> *const c_void {
 // Get a null pointer (equivalent to an offset of 0)
 // ptr::null()
 
+// Creates a vector of vertices for generating a circle in the x,y plane
+// Given a start position, radius, and amount of vertices
+fn create_circle_vertices(radius: f32, num_vertices: usize, center: Option<(f32, f32, f32)>) -> Vec<f32> {
+    let mut vertices: Vec<f32> = Vec::with_capacity(num_vertices * 3);
+
+    // If center is None, use (0,0,0)
+    let (start_x, start_y, start_z) = center.unwrap_or((0.0, 0.0, 0.0));
+
+    // Generate vertices
+    for i in 0..num_vertices {
+        let angle: f32 = 2.0 * std::f32::consts::PI * i as f32 / num_vertices as f32;
+
+        let x: f32 = start_x + radius * angle.cos();
+        let y: f32 = start_y + radius * angle.sin();
+        let z: f32 = start_z;
+
+        vertices.push(x);
+        vertices.push(y);
+        vertices.push(z);
+    }
+
+    vertices
+} 
+
+// Generates a vector containing rgba values. Creates as many as count, alpha is set to 1.
+fn generate_colors(count: usize) -> Vec<f32> {
+    let mut color_vec: Vec<f32> = Vec::with_capacity(count * 4);
+
+    let mut rng = rand::thread_rng();
+
+    for i in 0..count {
+        let r: f32 = rng.gen_range(0.0..1.0);
+        let g: f32 = rng.gen_range(0.0..1.0);
+        let b: f32 = rng.gen_range(0.0..1.0);
+
+        color_vec.push(r);
+        color_vec.push(g);
+        color_vec.push(b);
+        color_vec.push(1.0);
+    }
+
+   color_vec
+}
+
 
 // == // Generate your VAO here
 unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
-    let count: i32 = vertices.len() as i32;
-
     // Generate VAO and bind it
-    let mut vertex_array: u32 = 0;
-    gl::GenVertexArrays(count, &mut vertex_array);
+    let mut vertex_array:  u32 = 0;
+    gl::GenVertexArrays(1, &mut vertex_array);
     gl::BindVertexArray(vertex_array);
 
     // Generate VBO and bind it
@@ -75,12 +119,12 @@ unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
             gl::STATIC_DRAW
         );
         // Configure and enable VAP
-        gl::VertexAttribPointer(
+    gl::VertexAttribPointer(
             1,
              3,
              gl::FLOAT,
              gl::FALSE,
-             20,
+             3 * std::mem::size_of::<f32>() as i32,
              std::ptr::null()
         );
     gl::EnableVertexArrayAttrib(vertex_array, 1);
@@ -99,24 +143,88 @@ unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
         indices.as_ptr() as *const _,
         gl::STATIC_DRAW
     );
-    
-    
-    // Implement me!
 
-    // Also, feel free to delete comments :)
-
-    // This should:
-    // * Generate a VAO and bind it
-    // * Generate a VBO and bind it
-    // * Fill it with data
-    // * Configure a VAP for the data and enable it
-    // * Generate a IBO and bind it
-    // * Fill it with data
-    // * Return the ID of the VAO
-
-    return vertex_array;
+    vertex_array
 }
 
+// Create vao with color specified
+unsafe fn create_vao_w_colors(vertices: &Vec<f32>, indices: &Vec<u32>, colors: &Vec<f32>) -> Result<u32, String> {
+    if vertices.len() / 3 != colors.len() / 4 {
+        return Err(format!("Must contain one color per vertice! Vertices: {}, Colors: {}", vertices.len(), colors.len()));
+    }
+    // Generate VAO and bind it
+    let mut vertex_array:  u32 = 0;
+    gl::GenVertexArrays(1, &mut vertex_array);
+    gl::BindVertexArray(vertex_array);
+
+    // Generate VBO and bind it
+    let mut vertex_buffer: u32 = 0;
+    gl::GenBuffers(1, &mut vertex_buffer);
+    gl::BindBuffer(gl::ARRAY_BUFFER, vertex_buffer);
+
+    // Fill it with data
+    let size = vertices.len() * std::mem::size_of::<f32>();
+    gl::BufferData(
+            gl::ARRAY_BUFFER,
+            size as isize,
+            vertices.as_ptr() as *const _,
+            gl::STATIC_DRAW
+        );
+
+    // Configure and enable VAP
+    gl::VertexAttribPointer(
+            1,
+             3,
+             gl::FLOAT,
+             gl::FALSE,
+             3 * std::mem::size_of::<f32>() as i32,
+             std::ptr::null()
+        );
+    gl::EnableVertexArrayAttrib(vertex_array, 1);
+
+    
+    // Generate VBO for color and bind it
+    let size = colors.len() * std::mem::size_of::<f32>();
+    let mut color_buffer: u32 = 0;
+    gl::GenBuffers(1, &mut color_buffer);
+    gl::BindBuffer(gl::ARRAY_BUFFER, color_buffer);
+
+    // Fill VBO with colors
+    gl::BufferData(
+            gl::ARRAY_BUFFER,
+            size as isize,
+            colors.as_ptr() as *const _,
+            
+            gl::STATIC_DRAW
+        );
+
+    gl::VertexAttribPointer(
+        2, 
+        4,
+        gl::FLOAT,
+        gl::FALSE,
+        4 * std::mem::size_of::<f32>() as i32,
+        std::ptr::null()
+        );
+    gl::EnableVertexAttribArray( 2);
+
+    // Generate IBO and bind it
+    let mut index_buffer: u32 = 0;
+    let indices_size = indices.len() * std::mem::size_of::<u32>();
+    
+    gl::GenBuffers(1, &mut index_buffer);
+    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, index_buffer);
+
+    // Fill it
+    gl::BufferData(
+        gl::ELEMENT_ARRAY_BUFFER,
+        indices_size as isize,
+        indices.as_ptr() as *const _,
+        gl::STATIC_DRAW
+    );
+
+    Ok(vertex_array)
+}
 
 fn main() {
     // Set up the necessary objects to deal with windows and event handling
@@ -178,38 +286,57 @@ fn main() {
         }
 
         // Set up VAO
+       
+       let vertices: Vec<f32> = vec![
+            -0.9, -0.2, 0.0,
+            -0.5, -0.3, 0.0,
+            -0.7,  0.1, 0.0,
 
-        let vertices: Vec<f32> = vec![
-            -0.9, -0.8,
-            -0.5, -0.8,
-            -0.7, -0.4,
+            -0.2, -0.3, 0.0,
+            0.2, -0.3, 0.0,
+            0.0,  0.1, 0.0,
 
-            0.5, -0.8,
-            0.9, -0.8,
-            0.7, -0.4,
-
-            -0.9,  0.0,
-            -0.5,  0.0,
-            -0.7,  0.4,
-
-            0.5,  0.0,
-            0.9,  0.0,
-            0.7,  0.4,
-
-            -0.2,  0.3,
-            0.2,  0.3,
-            0.0,  0.8,
+            0.5, -0.2, 0.0,
+            0.9, -0.2, 0.0,
+            0.7,  0.1, 0.0,
         ];
 
         let indices: Vec<u32> = vec![
             0, 1, 2,
             3, 4, 5,
-            6, 7, 8,
-            9, 10, 11,
-            12, 13, 14,
+            6, 7, 8
         ];
+        /*
+        let colors: Vec<f32> = vec![
+            1.0, 0.57, 0.71, 1.0,
+            0.53, 0.29, 1.0, 1.0,
+            0.53, 0.98, 0.38, 1.0,
+        ];
+         */
 
-        let my_vao = unsafe {create_vao(&vertices, &indices)};
+        let colors = generate_colors(vertices.len() / 3);
+
+        
+        let my_vao = unsafe {
+            match create_vao_w_colors(&vertices, &indices, &colors) {
+                Ok(result) => result,
+                Err(error) => {
+                    println!("Error: {}", error);
+                    std::process::exit(1);
+                }
+            }
+        };
+
+        //let my_vao = unsafe {create_vao(&vertices, &indices)};
+
+        /*
+        const NUM_VERTICES: usize = 36;
+        let circle_vertices: Vec<f32> = create_circle_vertices(0.2, NUM_VERTICES, None);
+
+        let circle_indices: Vec<u32> = (0..NUM_VERTICES as u32).collect();
+
+        let circle_vao: u32 = unsafe {create_vao(&circle_vertices, &circle_indices)};
+         */
 
 
         // == // Set up your shaders here
@@ -221,29 +348,14 @@ fn main() {
                 .link()
         };
 
-        // Activate shaders and draw vao
         unsafe {
             simple_shader.activate();
-            gl::BindVertexArray(my_vao);
-
         }
 
-        
-
-        // Basic usage of shader helper:
-        // The example code below creates a 'shader' object.
-        // It which contains the field `.program_id` and the method `.activate()`.
-        // The `.` in the path is relative to `Cargo.toml`.
-        // This snippet is not enough to do the exercise, and will need to be modified (outside
-        // of just using the correct path), but it only needs to be called once
-
-        /*
-        let simple_shader = unsafe {
-            shader::ShaderBuilder::new()
-                .attach_file("./path/to/simple/shader.file")
-                .link()
+        // Get time location from shader
+        let time_location = unsafe {
+            gl::GetUniformLocation(simple_shader.program_id, b"time\0".as_ptr() as *const i8)
         };
-        */
 
 
         // Used to demonstrate keyboard handling for exercise 2.
@@ -310,6 +422,33 @@ fn main() {
 
 
                 // == // Issue the necessary gl:: commands to draw your scene here
+
+                // Color change
+                //gl::UseProgram(simple_shader.program_id);
+                //gl::Uniform1f(time_location, elapsed);
+
+                /*
+                // Draw circle
+                gl::BindVertexArray(circle_vao);
+                gl::DrawElements(
+                    gl::TRIANGLE_FAN,
+                    circle_indices.len() as i32,
+                    gl::UNSIGNED_INT,
+                    ptr::null(),
+                );  */
+
+                
+
+                // Draw triangles
+                
+                gl::BindVertexArray(my_vao);
+                gl::DrawElements(
+                    gl::TRIANGLES,
+                    indices.len() as i32,
+                    gl::UNSIGNED_INT,
+                    ptr::null(),
+                );
+                
 
 
 
