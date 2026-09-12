@@ -294,38 +294,37 @@ fn main() {
         // Set up VAO
        
       let vertices: Vec<f32> = vec![
-        -0.9, -0.2, 0.0,
-        -0.5, -0.3, 0.0,
-        -0.7,  0.1, 0.0,
+            -0.9, -0.2, 0.0,
+            -0.5, -0.3, 0.0,
+            -0.7,  0.1, 0.0,
 
-        -0.2, -0.3, 0.0,
-        0.2, -0.3, 0.0,
-        0.0,  0.1, 0.0,
+            -0.2, -0.3, 0.0,
+            0.2, -0.3, 0.0,
+            0.0,  0.1, 0.0,
 
-        0.5, -0.2, 0.0,
-        0.9, -0.2, 0.0,
-        0.7,  0.1, 0.0,
-    ];
+            0.5, -0.2, 0.0,
+            0.9, -0.2, 0.0,
+            0.7,  0.1, 0.0,
+        ];
 
         let indices: Vec<u32> = vec![
             0, 1, 2,
             3, 4, 5,
             6, 7, 8
         ];
-        // let colors = generate_colors(vertices.len() / 3);
 
         let colors: Vec<f32> = vec![
-            // green
+            // Green
             0.68, 0.984, 0.0, 0.5,
             0.68, 0.984, 0.0, 0.5,
             0.68, 0.984, 0.0, 0.5,
 
-            // pink
+            // Pink
             1.0, 0.0, 0.396, 0.5,
             1.0, 0.0, 0.396, 0.5,
             1.0, 0.0, 0.396, 0.5,
 
-            // blue
+            // Blue
             0.173, 0.161, 1.0, 0.5,
             0.173, 0.161, 1.0, 0.5,
             0.173, 0.161, 1.0, 0.5,
@@ -341,18 +340,6 @@ fn main() {
                 }
             }
         };
-
-        //let my_vao = unsafe {create_vao(&vertices, &indices)};
-
-        /*
-        const NUM_VERTICES: usize = 36;
-        let circle_vertices: Vec<f32> = create_circle_vertices(0.2, NUM_VERTICES, None);
-
-        let circle_indices: Vec<u32> = (0..NUM_VERTICES as u32).collect();
-
-        let circle_vao: u32 = unsafe {create_vao(&circle_vertices, &circle_indices)};
-         */
-
 
         // == // Set up your shaders here
 
@@ -412,6 +399,8 @@ fn main() {
                     unsafe { gl::Viewport(0, 0, new_size.0 as i32, new_size.1 as i32); }
                 }
             }
+
+            // Reset transformatioin matrices
             translation_matrix = glm::Mat4::identity();
             pitch_matrix = glm::Mat4::identity();
             yaw_matrix = glm::Mat4::identity();
@@ -422,6 +411,7 @@ fn main() {
                     match key {
                         // The `VirtualKeyCode` enum is defined here:
                         //    https://docs.rs/winit/0.25.0/winit/event/enum.VirtualKeyCode.html
+                        // Rotation
                         VirtualKeyCode::Up => {
                             camera.rotation[0] -= delta_time;
                         }
@@ -434,6 +424,7 @@ fn main() {
                         VirtualKeyCode::Left => {
                             camera.rotation[1] -= delta_time;
                         }
+                        // Translation
                         VirtualKeyCode::W => {
                             camera.position[1] += delta_time;
                         }
