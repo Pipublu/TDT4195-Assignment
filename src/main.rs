@@ -27,7 +27,7 @@ const INITIAL_SCREEN_H: u32 = 600;
 
 struct Camera {
     position: glm::Vec3,
-    rotation: glm::Vec3,
+    rotation: glm::Vec2,
 }
 
 // == // Helper functions to make interacting with OpenGL a little bit prettier. You *WILL* need these! // == //
@@ -378,19 +378,18 @@ fn main() {
         };
 
         // Prepare matrices
-        let mut translation_matrix;
-
-        let mut rotation_matrix ;
-
-        let mut transformation_matrix;
+        let mut translation_matrix:glm::Mat4;
+        let mut rotation_matrix:glm::Mat4 ;
+        let mut pitch_matrix:glm::Mat4 ;
+        let mut yaw_matrix:glm::Mat4 ;
+        let mut transformation_matrix:glm::Mat4;
 
         let projection_matrix: glm::Mat4 = glm::perspective(window_aspect_ratio, 90.0, 1.0, 100.0);
-
         let mut matrix:glm::Mat4;
 
-        let mut camera = Camera {
+        let mut camera: Camera = Camera {
             position: glm::vec3(0.0, 0.0, 2.0),
-            rotation: glm::vec3(0.0, 0.0, 0.0),
+            rotation: glm::vec2(0.0, 0.0),
         };
  
         // The main rendering loop
@@ -414,7 +413,8 @@ fn main() {
                 }
             }
             translation_matrix = glm::Mat4::identity();
-            rotation_matrix = glm::Mat4::identity();
+            pitch_matrix = glm::Mat4::identity();
+            yaw_matrix = glm::Mat4::identity();
 
             // Handle keyboard input
             if let Ok(keys) = pressed_keys.lock() {
@@ -423,12 +423,16 @@ fn main() {
                         // The `VirtualKeyCode` enum is defined here:
                         //    https://docs.rs/winit/0.25.0/winit/event/enum.VirtualKeyCode.html
                         VirtualKeyCode::Up => {
+                            camera.rotation[0] -= delta_time;
                         }
                         VirtualKeyCode::Down => {
+                            camera.rotation[0] += delta_time;
                         }
                         VirtualKeyCode::Right => {
+                            camera.rotation[1] += delta_time;
                         }
                         VirtualKeyCode::Left => {
+                            camera.rotation[1] -= delta_time;
                         }
                         VirtualKeyCode::W => {
                             camera.position[1] += delta_time;
@@ -443,10 +447,10 @@ fn main() {
                             camera.position[0]  += delta_time;
                         }
                         VirtualKeyCode::Space => {
-                            camera.position[2]  += delta_time;
+                            camera.position[2]  -= delta_time;
                         }
                         VirtualKeyCode::LShift => {
-                            camera.position[2]  -= delta_time;
+                            camera.position[2]  += delta_time;
                         }
 
                         // default handler:
@@ -468,7 +472,19 @@ fn main() {
             translation_matrix[(1, 3)] = -camera.position[1];
             translation_matrix[(2, 3)] = -camera.position[2];
 
+             // Pitch rotation
+            yaw_matrix[(1, 1)] = camera.rotation[0].cos();
+            yaw_matrix[(1, 2)] = -camera.rotation[0].sin();
+            yaw_matrix[(2, 1)] = camera.rotation[0].sin();
+            yaw_matrix[(2, 2)] = camera.rotation[0].cos();
 
+            // Yaw rotation
+            pitch_matrix[(0, 0)] = camera.rotation[1].cos();
+            pitch_matrix[(0, 2)] = camera.rotation[1].sin();
+            pitch_matrix[(2, 0)] = -camera.rotation[1].sin();
+            pitch_matrix[(2, 2)] = camera.rotation[1].cos();
+
+            rotation_matrix = yaw_matrix * pitch_matrix;
             transformation_matrix = rotation_matrix * translation_matrix;
             matrix = projection_matrix * transformation_matrix;
 
