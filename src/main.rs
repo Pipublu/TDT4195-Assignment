@@ -11,6 +11,7 @@ extern crate nalgebra_glm as glm;
 use std::{ mem, ptr, os::raw::c_void };
 use std::{result, thread};
 use std::sync::{Mutex, Arc, RwLock};
+use gl::FALSE;
 use rand::Rng;
 
 
@@ -23,6 +24,11 @@ use glutin::event_loop::ControlFlow;
 // initial window size
 const INITIAL_SCREEN_W: u32 = 800;
 const INITIAL_SCREEN_H: u32 = 600;
+
+struct Camera {
+    position: glm::Vec3,
+    rotation: glm::Vec3,
+}
 
 // == // Helper functions to make interacting with OpenGL a little bit prettier. You *WILL* need these! // == //
 
@@ -287,34 +293,43 @@ fn main() {
 
         // Set up VAO
        
-       let vertices: Vec<f32> = vec![
-            -0.9, -0.2, 0.0,
-            -0.5, -0.3, 0.0,
-            -0.7,  0.1, 0.0,
+      let vertices: Vec<f32> = vec![
+        -0.9, -0.2, 0.0,
+        -0.5, -0.3, 0.0,
+        -0.7,  0.1, 0.0,
 
-            -0.2, -0.3, 0.0,
-            0.2, -0.3, 0.0,
-            0.0,  0.1, 0.0,
+        -0.2, -0.3, 0.0,
+        0.2, -0.3, 0.0,
+        0.0,  0.1, 0.0,
 
-            0.5, -0.2, 0.0,
-            0.9, -0.2, 0.0,
-            0.7,  0.1, 0.0,
-        ];
+        0.5, -0.2, 0.0,
+        0.9, -0.2, 0.0,
+        0.7,  0.1, 0.0,
+    ];
 
         let indices: Vec<u32> = vec![
             0, 1, 2,
             3, 4, 5,
             6, 7, 8
         ];
-        /*
-        let colors: Vec<f32> = vec![
-            1.0, 0.57, 0.71, 1.0,
-            0.53, 0.29, 1.0, 1.0,
-            0.53, 0.98, 0.38, 1.0,
-        ];
-         */
+        // let colors = generate_colors(vertices.len() / 3);
 
-        let colors = generate_colors(vertices.len() / 3);
+        let colors: Vec<f32> = vec![
+            // green
+            0.68, 0.984, 0.0, 0.5,
+            0.68, 0.984, 0.0, 0.5,
+            0.68, 0.984, 0.0, 0.5,
+
+            // pink
+            1.0, 0.0, 0.396, 0.5,
+            1.0, 0.0, 0.396, 0.5,
+            1.0, 0.0, 0.396, 0.5,
+
+            // blue
+            0.173, 0.161, 1.0, 0.5,
+            0.173, 0.161, 1.0, 0.5,
+            0.173, 0.161, 1.0, 0.5,
+        ];
 
         
         let my_vao = unsafe {
@@ -357,11 +372,27 @@ fn main() {
             gl::GetUniformLocation(simple_shader.program_id, b"time\0".as_ptr() as *const i8)
         };
 
+        // Get matrix location from shader
+        let matrix_location = unsafe {
+            gl::GetUniformLocation(simple_shader.program_id, b"matrix\0".as_ptr() as *const i8)
+        };
 
-        // Used to demonstrate keyboard handling for exercise 2.
-        let mut _arbitrary_number = 0.0; // feel free to remove
+        // Prepare matrices
+        let mut translation_matrix;
 
+        let mut rotation_matrix ;
 
+        let mut transformation_matrix;
+
+        let projection_matrix: glm::Mat4 = glm::perspective(window_aspect_ratio, 90.0, 1.0, 100.0);
+
+        let mut matrix:glm::Mat4;
+
+        let mut camera = Camera {
+            position: glm::vec3(0.0, 0.0, 2.0),
+            rotation: glm::vec3(0.0, 0.0, 0.0),
+        };
+ 
         // The main rendering loop
         let first_frame_time = std::time::Instant::now();
         let mut previous_frame_time = first_frame_time;
@@ -382,6 +413,8 @@ fn main() {
                     unsafe { gl::Viewport(0, 0, new_size.0 as i32, new_size.1 as i32); }
                 }
             }
+            translation_matrix = glm::Mat4::identity();
+            rotation_matrix = glm::Mat4::identity();
 
             // Handle keyboard input
             if let Ok(keys) = pressed_keys.lock() {
@@ -389,14 +422,32 @@ fn main() {
                     match key {
                         // The `VirtualKeyCode` enum is defined here:
                         //    https://docs.rs/winit/0.25.0/winit/event/enum.VirtualKeyCode.html
-
+                        VirtualKeyCode::Up => {
+                        }
+                        VirtualKeyCode::Down => {
+                        }
+                        VirtualKeyCode::Right => {
+                        }
+                        VirtualKeyCode::Left => {
+                        }
+                        VirtualKeyCode::W => {
+                            camera.position[1] += delta_time;
+                        }
                         VirtualKeyCode::A => {
-                            _arbitrary_number += delta_time;
+                            camera.position[0]  -= delta_time;
+                        }
+                        VirtualKeyCode::S => {
+                            camera.position[1]  -= delta_time;
                         }
                         VirtualKeyCode::D => {
-                            _arbitrary_number -= delta_time;
+                            camera.position[0]  += delta_time;
                         }
-
+                        VirtualKeyCode::Space => {
+                            camera.position[2]  += delta_time;
+                        }
+                        VirtualKeyCode::LShift => {
+                            camera.position[2]  -= delta_time;
+                        }
 
                         // default handler:
                         _ => { }
@@ -413,7 +464,13 @@ fn main() {
             }
 
             // == // Please compute camera transforms here (exercise 2 & 3)
+            translation_matrix[(0, 3)] = -camera.position[0];
+            translation_matrix[(1, 3)] = -camera.position[1];
+            translation_matrix[(2, 3)] = -camera.position[2];
 
+
+            transformation_matrix = rotation_matrix * translation_matrix;
+            matrix = projection_matrix * transformation_matrix;
 
             unsafe {
                 // Clear the color and depth buffers
@@ -422,25 +479,12 @@ fn main() {
 
 
                 // == // Issue the necessary gl:: commands to draw your scene here
-
-                // Color change
-                //gl::UseProgram(simple_shader.program_id);
-                //gl::Uniform1f(time_location, elapsed);
-
-                /*
-                // Draw circle
-                gl::BindVertexArray(circle_vao);
-                gl::DrawElements(
-                    gl::TRIANGLE_FAN,
-                    circle_indices.len() as i32,
-                    gl::UNSIGNED_INT,
-                    ptr::null(),
-                );  */
-
+                // Send uniform varibles to vertex shader
+                gl::UseProgram(simple_shader.program_id);
+                gl::Uniform1f(time_location, elapsed);
+                gl::UniformMatrix4fv(matrix_location,1, FALSE, matrix.as_ptr());
                 
-
                 // Draw triangles
-                
                 gl::BindVertexArray(my_vao);
                 gl::DrawElements(
                     gl::TRIANGLES,
@@ -448,9 +492,6 @@ fn main() {
                     gl::UNSIGNED_INT,
                     ptr::null(),
                 );
-                
-
-
 
             }
 

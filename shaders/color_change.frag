@@ -3,7 +3,6 @@
 out vec4 color;
 uniform float time;
 
-
 void main()
 {
     float r = (sin(time * 0.5) + 1.0) / 2.0;
