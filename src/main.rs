@@ -8,6 +8,7 @@
 #![allow(unused_variables)]
 */
 extern crate nalgebra_glm as glm;
+use std::ffi::CString;
 use std::{ mem, ptr, os::raw::c_void };
 use std::{result, thread};
 use std::sync::{Mutex, Arc, RwLock};
@@ -17,9 +18,11 @@ use rand::Rng;
 
 mod shader;
 mod util;
+mod mesh;
 
 use glutin::event::{Event, WindowEvent, DeviceEvent, KeyboardInput, ElementState::{Pressed, Released}, VirtualKeyCode::{self, *}};
 use glutin::event_loop::ControlFlow;
+use tobj::Mesh;
 
 // initial window size
 const INITIAL_SCREEN_W: u32 = 800;
@@ -232,6 +235,110 @@ unsafe fn create_vao_w_colors(vertices: &Vec<f32>, indices: &Vec<u32>, colors: &
     Ok(vertex_array)
 }
 
+
+unsafe fn create_vao_2(vertices: &Vec<f32>, indices: &Vec<u32>, colors: &Vec<f32>, normals: &Vec<f32>) -> u32 {
+    // Generate VAO and bind it
+    let mut vertex_array:  u32 = 0;
+    gl::GenVertexArrays(1, &mut vertex_array);
+    gl::BindVertexArray(vertex_array);
+
+    // Generate VBO and bind it
+    let mut vertex_buffer: u32 = 0;
+    gl::GenBuffers(1, &mut vertex_buffer);
+    gl::BindBuffer(gl::ARRAY_BUFFER, vertex_buffer);
+
+    // Fill it with data
+    let size = vertices.len() * std::mem::size_of::<f32>();
+    gl::BufferData(
+            gl::ARRAY_BUFFER,
+            size as isize,
+            vertices.as_ptr() as *const _,
+            gl::STATIC_DRAW
+        );
+
+    // Configure and enable VAP
+    gl::VertexAttribPointer(
+            1,
+             3,
+             gl::FLOAT,
+             gl::FALSE,
+             3 * std::mem::size_of::<f32>() as i32,
+             std::ptr::null()
+        );
+    gl::EnableVertexArrayAttrib(vertex_array, 1);
+
+    // If colors:
+    if vertices.len() / 3 == colors.len() / 4 {
+        println!("Making VAO with colors!");
+        // Generate VBO for color and bind it
+        let size = colors.len() * std::mem::size_of::<f32>();
+        let mut color_buffer: u32 = 0;
+        gl::GenBuffers(1, &mut color_buffer);
+        gl::BindBuffer(gl::ARRAY_BUFFER, color_buffer);
+
+        // Fill VBO with colors
+        gl::BufferData(
+                gl::ARRAY_BUFFER,
+                size as isize,
+                colors.as_ptr() as *const _,
+                gl::STATIC_DRAW
+            );
+
+        gl::VertexAttribPointer(
+            2, 
+            4,
+            gl::FLOAT,
+            gl::FALSE,
+            4 * std::mem::size_of::<f32>() as i32,
+            std::ptr::null()
+            );
+        gl::EnableVertexAttribArray( 2);
+    }
+
+    //If normals
+    if vertices.len() == normals.len() {
+         println!("Making VAO with normals!");
+        // Generate VBO for normals and bind it
+        let size = normals.len() * std::mem::size_of::<f32>();
+        let mut norm_buffer: u32 = 0;
+        gl::GenBuffers(1, &mut norm_buffer);
+        gl::BindBuffer(gl::ARRAY_BUFFER, norm_buffer);
+
+        gl::BufferData(
+                gl::ARRAY_BUFFER,
+                size as isize,
+                normals.as_ptr() as *const _,
+                gl::STATIC_DRAW
+        );
+
+        gl::VertexAttribPointer(
+            3,
+             3,
+             gl::FLOAT,
+             gl::FALSE,
+             3 * std::mem::size_of::<f32>() as i32,
+             std::ptr::null()
+        );
+        gl::EnableVertexArrayAttrib(vertex_array, 3);
+    }
+
+     // Generate IBO and bind it
+    let mut index_buffer: u32 = 0;
+    let indices_size = indices.len() * std::mem::size_of::<u32>();
+    
+    gl::GenBuffers(1, &mut index_buffer);
+    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, index_buffer);
+
+    // Fill it
+    gl::BufferData(
+        gl::ELEMENT_ARRAY_BUFFER,
+        indices_size as isize,
+        indices.as_ptr() as *const _,
+        gl::STATIC_DRAW
+    );
+    vertex_array
+}
+
 fn main() {
     // Set up the necessary objects to deal with windows and event handling
     let el = glutin::event_loop::EventLoop::new();
@@ -292,27 +399,6 @@ fn main() {
         }
 
         // Set up VAO
-       
-      let vertices: Vec<f32> = vec![
-            -0.9, -0.2, 0.0,
-            -0.5, -0.3, 0.0,
-            -0.7,  0.1, 0.0,
-
-            -0.2, -0.3, 0.0,
-            0.2, -0.3, 0.0,
-            0.0,  0.1, 0.0,
-
-            0.5, -0.2, 0.0,
-            0.9, -0.2, 0.0,
-            0.7,  0.1, 0.0,
-        ];
-
-        let indices: Vec<u32> = vec![
-            0, 1, 2,
-            3, 4, 5,
-            6, 7, 8
-        ];
-
         let colors: Vec<f32> = vec![
             // Green
             0.68, 0.984, 0.0, 0.5,
@@ -330,7 +416,7 @@ fn main() {
             0.173, 0.161, 1.0, 0.5,
         ];
 
-        
+        /*
         let my_vao = unsafe {
             match create_vao_w_colors(&vertices, &indices, &colors) {
                 Ok(result) => result,
@@ -340,6 +426,7 @@ fn main() {
                 }
             }
         };
+        */
 
         // == // Set up your shaders here
 
@@ -350,9 +437,46 @@ fn main() {
                 .link()
         };
 
+
+
         unsafe {
             simple_shader.activate();
         }
+
+        // Load meshes
+        let lunar_surface = mesh::Terrain::load("./shaders/lunarsurface.obj");
+        let lunar_vao: u32= unsafe {
+            create_vao_2(&lunar_surface.vertices, &lunar_surface.indices, &Vec::<f32>::new(), &lunar_surface.normals)
+        };
+
+        let helicopter = mesh::Helicopter::load("./shaders/helicopter.obj");
+
+        let helicopter_body = helicopter.body;
+        let helicopter_body_vao: u32= unsafe {
+            create_vao_2(&helicopter_body.vertices, &helicopter_body.indices, &Vec::<f32>::new(), &helicopter_body.normals)
+        };
+
+        let helicopter_door = helicopter.door;
+        let helicopter_door_vao: u32= unsafe {
+            create_vao_2(&helicopter_door.vertices, &helicopter_door.indices, &Vec::<f32>::new(), &helicopter_door.normals)
+        };
+
+
+        let helicopter_main_rotor = helicopter.main_rotor;
+        let helicopter_main_rotor_vao: u32= unsafe {
+            create_vao_2(&helicopter_main_rotor.vertices, &helicopter_main_rotor.indices, &Vec::<f32>::new(), &helicopter_body.normals)
+        };
+
+
+        let helicopter_tail_rotor = helicopter.tail_rotor;
+        let helicopter_tail_rotor_vao: u32= unsafe {
+            create_vao_2(&helicopter_tail_rotor.vertices, &helicopter_tail_rotor.indices, &Vec::<f32>::new(), &helicopter_body.normals)
+        };
+
+
+
+
+
 
         // Get time location from shader
         let time_location = unsafe {
@@ -371,7 +495,7 @@ fn main() {
         let mut yaw_matrix:glm::Mat4 ;
         let mut transformation_matrix:glm::Mat4;
 
-        let projection_matrix: glm::Mat4 = glm::perspective(window_aspect_ratio, 90.0, 1.0, 100.0);
+        let projection_matrix: glm::Mat4 = glm::perspective(window_aspect_ratio, 90.0, 1.0, 1000.0);
         let mut matrix:glm::Mat4;
 
         let mut camera: Camera = Camera {
@@ -426,22 +550,22 @@ fn main() {
                         }
                         // Translation
                         VirtualKeyCode::W => {
-                            camera.position[1] += delta_time;
+                            camera.position[1] += 50.0 *delta_time;
                         }
                         VirtualKeyCode::A => {
-                            camera.position[0]  -= delta_time;
+                            camera.position[0]  -= 50.0 *delta_time;
                         }
                         VirtualKeyCode::S => {
-                            camera.position[1]  -= delta_time;
+                            camera.position[1]  -= 50.0 *delta_time;
                         }
                         VirtualKeyCode::D => {
-                            camera.position[0]  += delta_time;
+                            camera.position[0]  += 50.0 * delta_time;
                         }
                         VirtualKeyCode::Space => {
-                            camera.position[2]  -= delta_time;
+                            camera.position[2]  -= 100.0 * delta_time;
                         }
                         VirtualKeyCode::LShift => {
-                            camera.position[2]  += delta_time;
+                            camera.position[2]  += 100.0 * delta_time;
                         }
 
                         // default handler:
@@ -491,14 +615,50 @@ fn main() {
                 gl::Uniform1f(time_location, elapsed);
                 gl::UniformMatrix4fv(matrix_location,1, FALSE, matrix.as_ptr());
                 
-                // Draw triangles
-                gl::BindVertexArray(my_vao);
+                // Draw
+
+                // Lunar surface
+                gl::BindVertexArray(lunar_vao);
                 gl::DrawElements(
                     gl::TRIANGLES,
-                    indices.len() as i32,
+                    lunar_surface.index_count,
                     gl::UNSIGNED_INT,
                     ptr::null(),
                 );
+
+                // Helicopter
+                gl::BindVertexArray(helicopter_body_vao);
+                gl::DrawElements(
+                    gl::TRIANGLES,
+                    helicopter_body.index_count,
+                    gl::UNSIGNED_INT,
+                    ptr::null(),
+                );
+
+                gl::BindVertexArray(helicopter_door_vao);
+                gl::DrawElements(
+                    gl::TRIANGLES,
+                    helicopter_door.index_count,
+                    gl::UNSIGNED_INT,
+                    ptr::null(),
+                );
+
+                gl::BindVertexArray(helicopter_main_rotor_vao);
+                gl::DrawElements(
+                    gl::TRIANGLES,
+                    helicopter_main_rotor.index_count,
+                    gl::UNSIGNED_INT,
+                    ptr::null(),
+                );
+
+                gl::BindVertexArray(helicopter_tail_rotor_vao);
+                gl::DrawElements(
+                    gl::TRIANGLES,
+                    helicopter_tail_rotor.index_count,
+                    gl::UNSIGNED_INT,
+                    ptr::null(),
+                );
+                
 
             }
 
