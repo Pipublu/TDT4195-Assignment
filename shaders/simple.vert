@@ -7,11 +7,12 @@ layout(location = 3) in vec3 aNorms;
 out vec4 color;
 uniform mat4 matrix;
 uniform float time;
+uniform mat4 model_matrix;
 out vec3 norms;
 
 void main()
 {
     gl_Position = matrix * vec4(position, 1.0);
     color = aColor;
-    norms = aNorms;
+    norms = normalize(mat3(model_matrix) * aNorms);
 }
