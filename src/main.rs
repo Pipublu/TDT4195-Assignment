@@ -112,135 +112,7 @@ fn generate_colors(count: usize) -> Vec<f32> {
 
 
 // == // Generate your VAO here
-unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
-    // Generate VAO and bind it
-    let mut vertex_array:  u32 = 0;
-    gl::GenVertexArrays(1, &mut vertex_array);
-    gl::BindVertexArray(vertex_array);
-
-    // Generate VBO and bind it
-    let mut vertex_buffer: u32 = 0;
-    gl::GenBuffers(1, &mut vertex_buffer);
-    gl::BindBuffer(gl::ARRAY_BUFFER, vertex_buffer);
-
-    // Fill it with data
-    let size = vertices.len() * std::mem::size_of::<f32>();
-    gl::BufferData(
-            gl::ARRAY_BUFFER,
-            size as isize,
-            vertices.as_ptr() as *const _,
-            gl::STATIC_DRAW
-        );
-        // Configure and enable VAP
-    gl::VertexAttribPointer(
-            1,
-             3,
-             gl::FLOAT,
-             gl::FALSE,
-             3 * std::mem::size_of::<f32>() as i32,
-             std::ptr::null()
-        );
-    gl::EnableVertexArrayAttrib(vertex_array, 1);
-
-    // Generate IBO and bind it
-    let mut index_buffer: u32 = 0;
-    let indices_size = indices.len() * std::mem::size_of::<u32>();
-    
-    gl::GenBuffers(1, &mut index_buffer);
-    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, index_buffer);
-
-    // Fill it
-    gl::BufferData(
-        gl::ELEMENT_ARRAY_BUFFER,
-        indices_size as isize,
-        indices.as_ptr() as *const _,
-        gl::STATIC_DRAW
-    );
-
-    vertex_array
-}
-
-// Create vao with color specified
-unsafe fn create_vao_w_colors(vertices: &Vec<f32>, indices: &Vec<u32>, colors: &Vec<f32>) -> Result<u32, String> {
-    if vertices.len() / 3 != colors.len() / 4 {
-        return Err(format!("Must contain one color per vertice! Vertices: {}, Colors: {}", vertices.len(), colors.len()));
-    }
-    // Generate VAO and bind it
-    let mut vertex_array:  u32 = 0;
-    gl::GenVertexArrays(1, &mut vertex_array);
-    gl::BindVertexArray(vertex_array);
-
-    // Generate VBO and bind it
-    let mut vertex_buffer: u32 = 0;
-    gl::GenBuffers(1, &mut vertex_buffer);
-    gl::BindBuffer(gl::ARRAY_BUFFER, vertex_buffer);
-
-    // Fill it with data
-    let size = vertices.len() * std::mem::size_of::<f32>();
-    gl::BufferData(
-            gl::ARRAY_BUFFER,
-            size as isize,
-            vertices.as_ptr() as *const _,
-            gl::STATIC_DRAW
-        );
-
-    // Configure and enable VAP
-    gl::VertexAttribPointer(
-            1,
-             3,
-             gl::FLOAT,
-             gl::FALSE,
-             3 * std::mem::size_of::<f32>() as i32,
-             std::ptr::null()
-        );
-    gl::EnableVertexArrayAttrib(vertex_array, 1);
-
-    
-    // Generate VBO for color and bind it
-    let size = colors.len() * std::mem::size_of::<f32>();
-    let mut color_buffer: u32 = 0;
-    gl::GenBuffers(1, &mut color_buffer);
-    gl::BindBuffer(gl::ARRAY_BUFFER, color_buffer);
-
-    // Fill VBO with colors
-    gl::BufferData(
-            gl::ARRAY_BUFFER,
-            size as isize,
-            colors.as_ptr() as *const _,
-            
-            gl::STATIC_DRAW
-        );
-
-    gl::VertexAttribPointer(
-        2, 
-        4,
-        gl::FLOAT,
-        gl::FALSE,
-        4 * std::mem::size_of::<f32>() as i32,
-        std::ptr::null()
-        );
-    gl::EnableVertexAttribArray( 2);
-
-    // Generate IBO and bind it
-    let mut index_buffer: u32 = 0;
-    let indices_size = indices.len() * std::mem::size_of::<u32>();
-    
-    gl::GenBuffers(1, &mut index_buffer);
-    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, index_buffer);
-
-    // Fill it
-    gl::BufferData(
-        gl::ELEMENT_ARRAY_BUFFER,
-        indices_size as isize,
-        indices.as_ptr() as *const _,
-        gl::STATIC_DRAW
-    );
-
-    Ok(vertex_array)
-}
-
-
-unsafe fn create_vao_2(vertices: &Vec<f32>, indices: &Vec<u32>, colors: &Vec<f32>, normals: &Vec<f32>) -> u32 {
+unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>, colors: &Vec<f32>, normals: &Vec<f32>) -> u32 {
     // Generate VAO and bind it
     let mut vertex_array:  u32 = 0;
     gl::GenVertexArrays(1, &mut vertex_array);
@@ -521,29 +393,29 @@ fn main() {
         // Load meshes and create VAOs
         let lunar_surface = mesh::Terrain::load("./shaders/lunarsurface.obj");
         let lunar_vao: u32= unsafe {
-            create_vao_2(&lunar_surface.vertices, &lunar_surface.indices, &lunar_surface.colors, &lunar_surface.normals)
+            create_vao(&lunar_surface.vertices, &lunar_surface.indices, &lunar_surface.colors, &lunar_surface.normals)
         };
 
         let helicopter = mesh::Helicopter::load("./shaders/helicopter.obj");
 
         let helicopter_body = helicopter.body;
         let helicopter_body_vao: u32= unsafe {
-            create_vao_2(&helicopter_body.vertices, &helicopter_body.indices, &helicopter_body.colors, &helicopter_body.normals)
+            create_vao(&helicopter_body.vertices, &helicopter_body.indices, &helicopter_body.colors, &helicopter_body.normals)
         };
 
         let helicopter_door = helicopter.door;
         let helicopter_door_vao: u32= unsafe {
-            create_vao_2(&helicopter_door.vertices, &helicopter_door.indices, &helicopter_door.colors, &helicopter_door.normals)
+            create_vao(&helicopter_door.vertices, &helicopter_door.indices, &helicopter_door.colors, &helicopter_door.normals)
         };
 
         let helicopter_main_rotor = helicopter.main_rotor;
         let helicopter_main_rotor_vao: u32= unsafe {
-            create_vao_2(&helicopter_main_rotor.vertices, &helicopter_main_rotor.indices, &helicopter_main_rotor.colors, &helicopter_main_rotor.normals)
+            create_vao(&helicopter_main_rotor.vertices, &helicopter_main_rotor.indices, &helicopter_main_rotor.colors, &helicopter_main_rotor.normals)
         };
 
         let helicopter_tail_rotor = helicopter.tail_rotor;
         let helicopter_tail_rotor_vao: u32= unsafe {
-            create_vao_2(&helicopter_tail_rotor.vertices, &helicopter_tail_rotor.indices, &helicopter_tail_rotor.colors, &helicopter_tail_rotor.normals)
+            create_vao(&helicopter_tail_rotor.vertices, &helicopter_tail_rotor.indices, &helicopter_tail_rotor.colors, &helicopter_tail_rotor.normals)
         };
 
 
